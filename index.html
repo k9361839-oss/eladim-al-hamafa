@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>אלעדים על המפה - גרסה סופית</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+
+    <style>
+        :root {
+            --bar-bg: #ffffff;
+            --text-color: #111b21;
+            --chat-bg: #efe7de;
+            --msg-me: #dcf8c6;
+            --msg-other: #ffffff;
+        }
+
+        body.dark-mode {
+            --bar-bg: #000000;
+            --text-color: #ffffff;
+            --chat-bg: #000000;
+            --msg-other: #202c33;
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* סרגל עליון */
+        header { 
+            background: var(--bar-bg); color: var(--text-color); padding: 10px 20px; 
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 10;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo-img { width: 45px; height: 45px; border-radius: 50%; border: 1px solid #008069; object-fit: cover; }
+        .header-info h1 { margin: 0; font-size: 1.2rem; }
+        .header-info p { margin: 0; font-size: 0.8rem; opacity: 0.7; }
+
+        /* אזור הצ'אט */
+        #chat-flow { 
+            flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px;
+            background-color: var(--chat-bg);
+            background-image: url('אלעדים על המפה.jpg');
+            background-repeat: no-repeat; background-position: center; background-size: 250px;
+            background-blend-mode: soft-light;
+        }
+
+        /* בועות הודעה */
+        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.15); font-size: 1rem; color: #111b21; }
+        body.dark-mode .msg { color: #e9edef; }
+
+        .msg.other { align-self: flex-start; background: var(--msg-other); border-top-right-radius: 2px; }
+        .msg.me { align-self: flex-end; background: var(--msg-me); border-top-left-radius: 2px; color: #111b21 !important; }
+
+        .msg-user { font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; display: block; }
+        .msg.other .msg-user { color: #008069; }
+        .msg.me .msg-user { color: #025144; }
+
+        /* חץ ירידה למטה - כחול בתוך עיגול לבן */
+        #down-btn {
+            position: fixed; bottom: 85px; left: 20px;
+            background: white; width: 45px; height: 45px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); cursor: pointer; border: none;
+            font-size: 1.5rem; color: #007bff; font-weight: bold;
+        }
+
+        /* סרגל תחתון */
+        footer { background: var(--bar-bg); padding: 10px 15px; display: flex; align-items: center; gap: 10px; border-top: 1px solid rgba(0,0,0,0.1); }
+        .input-box { flex: 1; background: #f0f2f5; border-radius: 25px; display: flex; align-items: center; padding: 0 15px; }
+        body.dark-mode .input-box { background: #2a3942; }
+        #msg-input { flex: 1; border: none; padding: 12px; outline: none; background: transparent; color: var(--text-color); font-size: 1rem; }
+
+        .send-btn { 
+            background: white; border-radius: 50%; width: 50px; height: 50px; 
+            display: flex; align-items: center; justify-content: center;
+            border: none; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+            color: #007bff; font-size: 1.6rem;
+        }
+
+        .mode-btn { background: none; border: none; color: var(--text-color); font-size: 1.4rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <img src="אלעדים על המפה.jpg" class="logo-img" onerror="this.src='https://via.placeholder.com/50'">
+            <div class="header-info">
+                <h1>אלעדים על המפה</h1>
+                <p id="user-count">מחשב רשומים...</p>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="number" id="jump-to" placeholder="#" style="width:40px; border-radius:5px; border:1px solid #ccc;">
+            <button class="mode-btn" onclick="toggleDarkMode()">☀️</button>
+            <div id="auth-ui"><button onclick="login()" style="cursor:pointer; border-radius:10px; border:1px solid #ccc; padding:5px;">כניסה</button></div>
+        </div>
+    </header>
+
+    <main id="chat-flow">
+        <div class="msg other" id="msg-1">
+            <span class="msg-user">ישראל כהן</span>
+            שלום! ברוכים הבאים לערוץ אלעדים על המפה.
+        </div>
+        <div class="msg me" id="msg-2">
+            <span class="msg-user">אתה</span>
+            היי! זה העיצוב החדש והנקי שביקשת.
+        </div>
+    </main>
+
+    <button id="down-btn" onclick="scrollToBottom()">↓</button>
+
+    <footer>
+        <span style="font-size: 1.5rem; cursor:pointer; color: #54656f;">📎</span>
+        <div class="input-box">
+            <input type="text" id="msg-input" placeholder="הקלד הודעה..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <span>😊</span>
+        </div>
+        <button class="send-btn" onclick="sendMessage()">➤</button>
+    </footer>
+
+<script>
+    // --- הגדרות פיירבייס ---
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+        projectId: "YOUR_PROJECT",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth();
+    let currentUser = null;
+
+    function login() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('auth-ui').innerHTML = `<img src="${user.photoURL}" style="width:35px; border-radius:50%;">`;
+            db.ref('presence/' + user.uid).set(true);
+        }
+    });
+
+    db.ref('presence').on('value', s => {
+        document.getElementById('user-count').innerText = s.numChildren() + " רשומים";
+    });
+
+    function toggleDarkMode() {
+        document.body.classList.toggle('dark-mode');
+        document.querySelector('.mode-btn').innerText = document.body.classList.contains('dark-mode') ? '🌙' : '☀️';
+    }
+
+    // פונקציית שליחת הודעה
+    function sendMessage() {
+        const input = document.getElementById('msg-input');
+        const text = input.value.trim();
+        
+        if (!text) return; // לא שולח הודעה ריקה
+        if (!currentUser) {
+            alert("עליך להתחבר כדי לשלוח הודעה!");
+            return;
+        }
+
+        db.ref('messages').push({
+            name: currentUser.displayName,
+            text: text,
+            uid: currentUser.uid,
+            time: Date.now()
+        });
+
+        input.value = ""; // איפוס התיבה
+    }
+
+    // קבלת הודעות מהשרת
+    db.ref('messages').on('child_added', s => {
+        const d = s.val();
+        const isMe = currentUser && d.uid === currentUser.uid;
+        const div = document.createElement('div');
+        div.id = "msg-" + s.key;
+        div.className = `msg ${isMe ? 'me' : 'other'}`;
+        div.innerHTML = `<span class="msg-user">${isMe ? 'אתה' : d.name}</span>${d.text}`;
+        document.getElementById('chat-flow').appendChild(div);
+        scrollToBottom();
+    });
+
+    function scrollToBottom() {
+        const c = document.getElementById('chat-flow');
+        c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
+    }
+
+    document.getElementById('jump-to').addEventListener('change', function() {
+        const target = document.getElementById('msg-' + this.value);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+</script>
+</body>
+</html>
